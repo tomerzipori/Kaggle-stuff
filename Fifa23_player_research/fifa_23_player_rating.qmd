@@ -13,16 +13,17 @@ editor: visual
 ---
 
 # Background and analysis plan
+
 The current [Data](https://www.kaggle.com/datasets/babatundezenith/fifa-archive) is an upload to *Kaggle* by Babatunde Zenith, and it includes information about players in the popular *Fifa 23* video game. Information includes: name, age, nationality, position, various football ratings and contract deals.
 
-The current notebook is an attempt at:  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1. Accurately and efficiently predicting player's overall rating.  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. Identifying important variables (features) for this prediction.
+The current notebook is an attempt at:\
+      1. Accurately and efficiently predicting player's overall rating.\
+      2. Identifying important variables (features) for this prediction.
 
 Both goals will be achieved using two methods: Elastic-net regression and XGBoost. Data pre-processing will be done with `tidyverse`, Model fitting and evaluation will be done with the `caret` and `gbm` packages.
 
-
 # Setup
+
 ```{r}
 #| output: false
 library(tidyverse) # For data-wrangling, pre-processing and plotting with ggplot2
@@ -31,8 +32,8 @@ library(gbm)       # For fitting XGBoost models
 library(glue)      # Helper package for nice-looking output
 ```
 
-
 # Loading data and inspecting it
+
 ```{r}
 players <- read_csv("Fifa_23_Players_Data.csv")
 glimpse(players)
@@ -40,22 +41,24 @@ glimpse(players)
 
 Quite a lot of features. Most of them are numeric which is good.
 
-
 # Pre-processing
+
 ## Re-naming columns (replacing spaces with underscores for ease)
+
 ```{r}
 names(players) <- str_replace_all(names(players), pattern = " ", replacement = "_")
 ```
 
-
 ## Looking at non-numeric variables
+
 First we'll look at potential garbage variables
+
 ```{r}
 names(select(players, where(is.character)))
 ```
 
-
 Almost all garbage data. Since I've noted that *Work Rate* variables are ordered (low-medium-high) We'll re-code them:
+
 ```{r}
 players <- players %>%
   mutate(Attacking_Work_Rate = case_when(Attacking_Work_Rate == "Low" ~ 1,
@@ -68,24 +71,24 @@ players <- players %>%
   mutate(across(where(is.character), ~na_if(., "-"))) # replacing all "-" with NA
 ```
 
-
 ## Searching for variables with large number of NA's
+
 ```{r}
 colSums(is.na(players))
 ```
 
-
 National team position seems sparse, we'll have to get rid of club_position as well for the model fitting. We'll also get rid of *best_position* because it creates so much dummy vars. I'll analyzed it in another day...
+
 ```{r}
 players <- select(players, -National_Team_Position, -Club_Position, -Best_Position)
 ```
 
-
 # Feature selection
+
 We'll first use elastic net regression to try and predict overall rating from the rest of the data, and also find which variables are most important.
 
-
 ## Data splitting
+
 ```{r}
 set.seed(14)
 train_id <- createDataPartition(y = players$Overall, p = 0.7, list = F)
@@ -94,9 +97,10 @@ players_train <- players[train_id,]
 players_test <- players[-train_id,]
 ```
 
-
 ## Elastic net
+
 ### Tuning grid for hyper-parameters
+
 ```{r}
 tg <- expand.grid(alpha = c(seq(0, 1, length.out = 25)),
                   lambda = c(2 ^ seq(10, -10, length = 100)))
@@ -105,6 +109,7 @@ tg <- expand.grid(alpha = c(seq(0, 1, length.out = 25)),
 Setting a relatively large range of hyper-parameters because elastic-net regression is not super expansive computationally.
 
 ### Training
+
 ```{r}
 #| eval: false
 elastic_reg <- train(Overall ~ ., 
@@ -121,21 +126,24 @@ elastic_reg <- train(Overall ~ .,
 elastic_reg <- read_rds("models/elasticnet_model.rds")
 ```
 
-
 ### Best hyper-parameters
+
 ```{r}
 elastic_reg$bestTune
 ```
 
 ### Different hyper-parameters performance - train error
+
 ```{r}
 plot(elastic_reg, xTrans = log, digits = 3)
 
 elastic_reg$results[elastic_reg$results$RMSE == min(elastic_reg$results$RMSE, na.rm = T),]
 ```
+
 All mixes of $\alpha$ and $\lambda$ hyper-parameters converge in the end.
 
 ### Model coefficients
+
 ```{r}
 #| echo: false
 options(scipen = 999)
@@ -153,8 +161,8 @@ round(elasnet_coeffs, 4)
 options(scipen = 0)
 ```
 
-
 ## Test error
+
 ```{r}
 elasticreg_pred <- predict(elastic_reg, newdata = players_test) # calculating model's prediction for test set
 ```
@@ -165,18 +173,19 @@ rmse_test <- glue("$RMSE={RMSE(elasticreg_pred, players_test$Overall)}$")
 r2_test <- glue("$R^2={R2(elasticreg_pred, players_test$Overall)}$")
 ```
 
-
 **Test error and effect size**\
 `r rmse_test`\
 `r r2_test`
 
 Very nice!
 
-
 # XGBoost
+
 ## Training control
-We'll use adaptive cross-validation in order to make the hyper-parameter search more efficient.  
+
+We'll use adaptive cross-validation in order to make the hyper-parameter search more efficient.\
 For further explanation on implementation in `R` [see](https://topepo.github.io/caret/adaptive-resampling.html). For further reading on theory [see](https://arxiv.org/abs/1405.6974).
+
 ```{r}
 tr <- trainControl(method = "adaptive_cv",
                    number = 10, repeats = 10,
@@ -185,8 +194,8 @@ tr <- trainControl(method = "adaptive_cv",
                    search = "random")
 ```
 
-
 ## Fitting the model
+
 ```{r}
 #| eval: false
 set.seed(14)
@@ -203,9 +212,10 @@ xgboost <- train(Overall ~ .,
 xgboost <- read_rds("models/xgboost_model.rds")
 ```
 
-
 ## CV error
+
 Getting the results of the best tuning parameters found.
+
 ```{r}
 xgboost$results[xgboost$results$RMSE == min(xgboost$results$RMSE, na.rm = T),5:10]
 ```
@@ -213,6 +223,7 @@ xgboost$results[xgboost$results$RMSE == min(xgboost$results$RMSE, na.rm = T),5:1
 Seems quite optimized, but is it overfitted?
 
 ## Test error and effect size
+
 ```{r}
 boost_pred <- predict(xgboost, players_test)
 ```
@@ -223,7 +234,6 @@ rmse_test <- glue("$RMSE={RMSE(boost_pred, players_test$Overall)}$")
 r2_test <- glue("$R^2={R2(boost_pred, players_test$Overall)}$")
 ```
 
-
 **Test error and effect size**\
 `r rmse_test`\
 `r r2_test`
@@ -231,6 +241,7 @@ r2_test <- glue("$R^2={R2(boost_pred, players_test$Overall)}$")
 Very Very nice!
 
 ## Variable importance
+
 ```{r}
 varimp <- caret::varImp(xgboost, scale = T)
 
@@ -238,6 +249,7 @@ varimp
 ```
 
 ## Plotting variable importance
+
 ```{r}
 #| fig-height: 7.5
 #| code-fold: true
@@ -261,13 +273,12 @@ varimp$importance %>%
         plot.caption = element_text(size = 6, hjust = 0.5, vjust = -5))
 ```
 
-Player value is the strongest predictor by far, with  a few interesting ones right behind it (CB_rating?)
+Player value is the strongest predictor by far, with a few interesting ones right behind it (CB_rating?)
 
 # Conclusion
+
 Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*.
 
-
-Links:  
-![](github-mark.png){.center width=20px}[Github](https://github.com/tomerzipori)  
-![](reddit.png){.center width=20px}[Reddit](https://www.reddit.com/user/Sadgasm1)
-
+Links:\
+![](github-mark.png){.center width="20px"}[Github](https://github.com/tomerzipori)\
+![](reddit.png){.center width="20px"}[Reddit](https://www.reddit.com/user/Sadgasm1)
