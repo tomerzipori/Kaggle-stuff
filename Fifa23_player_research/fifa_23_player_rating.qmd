@@ -1,6 +1,9 @@
 ---
 title: "What makes FIFA 23 players good?"
 author: "Tomer Zipori"
+date: 2023-05-06
+title-block-banner: "#990011FF"
+title-block-banner-color: "#FCF6F5FF"
 execute: 
   warning: false
   message: false
@@ -16,7 +19,7 @@ editor: visual
 ---
 
 # Background and analysis plan
-The current [Data](https://www.kaggle.com/datasets/babatundezenith/fifa-archive) is an upload to *Kaggle* by Babatunde Zenith, and it includes information about players in the popular *Fifa 23* video game. Information includes: name, age, nationality, position, various football ratings and contract deals.
+The current [Data](https://www.kaggle.com/datasets/babatundezenith/fifa-archive) is an upload to *Kaggle* by Babatunde Zenith, and it includes information about players in the popular *FIFA 23* video game. Information includes: name, age, nationality, position, various football ratings and contract deals.
 
 The current notebook is an attempt at:\
       1. Accurately and efficiently predicting player's overall rating.\
@@ -44,14 +47,14 @@ Quite a lot of features. Most of them are numeric which is good.
 # Pre-processing
 
 ## Re-naming columns
-###(replacing spaces with underscores for ease)
+Replacing spaces with underscores for ease.
 ```{r}
 names(players) <- str_replace_all(names(players), pattern = " ", replacement = "_")
 ```
 
 ## non-numeric variables
 
-First we'll look at potential garbage variables
+First we'll look at potential garbage variables.
 ```{r}
 names(select(players, where(is.character)))
 ```
@@ -263,11 +266,11 @@ varimp$importance %>%
         plot.caption = element_text(size = 6, hjust = 0.5, vjust = -5))
 ```
 
-Player value is the strongest predictor by far, with a few interesting ones right behind it (CB_rating?)
+Player value is the strongest predictor by far, with a few interesting ones right behind it (CB_rating?).
 
 # Conclusion
 
-Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*. Overall, Defensive ability seems to be quite an important predictor of Player's rating.
+Both methods supplied outstanding results with over 94% and 99% explained variance in rating. Not so surprisingly Player's value is strongly linked with their overall FIFA rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*. Overall, Defensive ability seems to be quite an important predictor of Player's rating.
 
 
 My links:\
