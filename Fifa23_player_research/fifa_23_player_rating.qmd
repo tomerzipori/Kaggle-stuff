@@ -7,13 +7,15 @@ execute:
 format:
   html:
     theme: cosmo
+    toc: true
+    toc-depth: 2
+    toc-location: right
   revealjs:
     css: styles.css
 editor: visual
 ---
 
 # Background and analysis plan
-
 The current [Data](https://www.kaggle.com/datasets/babatundezenith/fifa-archive) is an upload to *Kaggle* by Babatunde Zenith, and it includes information about players in the popular *Fifa 23* video game. Information includes: name, age, nationality, position, various football ratings and contract deals.
 
 The current notebook is an attempt at:\
@@ -23,7 +25,6 @@ The current notebook is an attempt at:\
 Both goals will be achieved using two methods: Elastic-net regression and XGBoost. Data pre-processing will be done with `tidyverse`, Model fitting and evaluation will be done with the `caret` and `gbm` packages.
 
 # Setup
-
 ```{r}
 #| output: false
 library(tidyverse) # For data-wrangling, pre-processing and plotting with ggplot2
@@ -32,8 +33,7 @@ library(gbm)       # For fitting XGBoost models
 library(glue)      # Helper package for nice-looking output
 ```
 
-# Loading data and inspecting it
-
+# Loading data
 ```{r}
 players <- read_csv("Fifa_23_Players_Data.csv")
 glimpse(players)
@@ -43,16 +43,15 @@ Quite a lot of features. Most of them are numeric which is good.
 
 # Pre-processing
 
-## Re-naming columns (replacing spaces with underscores for ease)
-
+## Re-naming columns
+###(replacing spaces with underscores for ease)
 ```{r}
 names(players) <- str_replace_all(names(players), pattern = " ", replacement = "_")
 ```
 
-## Looking at non-numeric variables
+## non-numeric variables
 
 First we'll look at potential garbage variables
-
 ```{r}
 names(select(players, where(is.character)))
 ```
@@ -72,7 +71,6 @@ players <- players %>%
 ```
 
 ## Searching for variables with large number of NA's
-
 ```{r}
 colSums(is.na(players))
 ```
@@ -88,7 +86,6 @@ players <- select(players, -National_Team_Position, -Club_Position, -Best_Positi
 We'll first use elastic net regression to try and predict overall rating from the rest of the data, and also find which variables are most important.
 
 ## Data splitting
-
 ```{r}
 set.seed(14)
 train_id <- createDataPartition(y = players$Overall, p = 0.7, list = F)
@@ -97,10 +94,9 @@ players_train <- players[train_id,]
 players_test <- players[-train_id,]
 ```
 
-## Elastic net
+# Elastic net
 
-### Tuning grid for hyper-parameters
-
+## Tuning grid for hyper-parameters
 ```{r}
 tg <- expand.grid(alpha = c(seq(0, 1, length.out = 25)),
                   lambda = c(2 ^ seq(10, -10, length = 100)))
@@ -108,8 +104,7 @@ tg <- expand.grid(alpha = c(seq(0, 1, length.out = 25)),
 
 Setting a relatively large range of hyper-parameters because elastic-net regression is not super expansive computationally.
 
-### Training
-
+## Training
 ```{r}
 #| eval: false
 elastic_reg <- train(Overall ~ ., 
@@ -126,14 +121,12 @@ elastic_reg <- train(Overall ~ .,
 elastic_reg <- read_rds("models/elasticnet_model.rds")
 ```
 
-### Best hyper-parameters
-
+## Best hyper-parameters
 ```{r}
 elastic_reg$bestTune
 ```
 
-### Different hyper-parameters performance - train error
-
+## Train/CV error
 ```{r}
 plot(elastic_reg, xTrans = log, digits = 3)
 
@@ -142,8 +135,7 @@ elastic_reg$results[elastic_reg$results$RMSE == min(elastic_reg$results$RMSE, na
 
 All mixes of $\alpha$ and $\lambda$ hyper-parameters converge in the end.
 
-### Model coefficients
-
+## Model coefficients
 ```{r}
 #| echo: false
 options(scipen = 999)
@@ -151,9 +143,14 @@ options(scipen = 999)
 
 ```{r}
 elasnet_coeffs <- coef(elastic_reg$finalModel, s = elastic_reg$bestTune$lambda)
-plot(elasnet_coeffs)
+plot(elasnet_coeffs, ylab = "Coefficient")
 
 round(elasnet_coeffs, 4)
+```
+
+The intercept is quite large. Let's look at the variables in a more informative scale.
+```{r}
+plot(elasnet_coeffs[-1,], ylab = "Coefficient")
 ```
 
 ```{r}
@@ -162,7 +159,6 @@ options(scipen = 0)
 ```
 
 ## Test error
-
 ```{r}
 elasticreg_pred <- predict(elastic_reg, newdata = players_test) # calculating model's prediction for test set
 ```
@@ -182,7 +178,6 @@ Very nice!
 # XGBoost
 
 ## Training control
-
 We'll use adaptive cross-validation in order to make the hyper-parameter search more efficient.\
 For further explanation on implementation in `R` [see](https://topepo.github.io/caret/adaptive-resampling.html). For further reading on theory [see](https://arxiv.org/abs/1405.6974).
 
@@ -194,8 +189,7 @@ tr <- trainControl(method = "adaptive_cv",
                    search = "random")
 ```
 
-## Fitting the model
-
+## Training
 ```{r}
 #| eval: false
 set.seed(14)
@@ -212,18 +206,16 @@ xgboost <- train(Overall ~ .,
 xgboost <- read_rds("models/xgboost_model.rds")
 ```
 
-## CV error
+## Train/CV error
 
 Getting the results of the best tuning parameters found.
-
 ```{r}
 xgboost$results[xgboost$results$RMSE == min(xgboost$results$RMSE, na.rm = T),5:10]
 ```
 
 Seems quite optimized, but is it overfitted?
 
-## Test error and effect size
-
+## Test error
 ```{r}
 boost_pred <- predict(xgboost, players_test)
 ```
@@ -241,15 +233,13 @@ r2_test <- glue("$R^2={R2(boost_pred, players_test$Overall)}$")
 Very Very nice!
 
 ## Variable importance
-
 ```{r}
 varimp <- caret::varImp(xgboost, scale = T)
 
 varimp
 ```
 
-## Plotting variable importance
-
+### Plotting variable importance
 ```{r}
 #| fig-height: 7.5
 #| code-fold: true
@@ -277,7 +267,7 @@ Player value is the strongest predictor by far, with a few interesting ones righ
 
 # Conclusion
 
-Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*. Overall, Defensive ability seems to be quite important predictor of Player's rating.
+Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*. Overall, Defensive ability seems to be quite an important predictor of Player's rating.
 
 
 My links:\
