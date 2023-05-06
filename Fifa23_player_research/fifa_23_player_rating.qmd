@@ -117,7 +117,7 @@ elastic_reg <- train(Overall ~ .,
                     method = "glmnet",
                     preProcess = c("center", "scale"), # for better interpatation of coefficients
                     tuneGrid = tg,
-                    trControl =  trainControl(method = "cv", number = 10)) # 1-fold Cross-Validation
+                    trControl =  trainControl(method = "cv", number = 10)) # 10-fold Cross-Validation
 ```
 
 ```{r}
@@ -277,8 +277,10 @@ Player value is the strongest predictor by far, with a few interesting ones righ
 
 # Conclusion
 
-Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*.
+Both methods supplied outstanding results with over 94% explained variances in rating. It seems that Player's value is strongly not surprisingly linked with their rating. A few notable findings are the importance of *Reactions*, *CB_rating* and *Defending_total*. Overall, Defensive ability seems to be quite important predictor of Player's rating.
 
-Links:\
-![](github-mark.png){.center width="20px"}[Github](https://github.com/tomerzipori)\
-![](reddit.png){.center width="20px"}[Reddit](https://www.reddit.com/user/Sadgasm1)
+
+My links:\
+[<img src="github-mark.png" width="30" height="30">](https://github.com/tomerzipori) | 
+[<img src="reddit.png" width="30" height="30">](https://www.reddit.com/user/Sadgasm1) | [<img src="twitter.png" width="30" height="30">](https://twitter.com/ZiporiTomer)
+
