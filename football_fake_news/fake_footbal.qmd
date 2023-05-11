@@ -1,0 +1,161 @@
+---
+title: "Real Vs. Fake news"
+author: "Tomer Zipori"
+date: 05-11-2023
+title-block-banner: "black"
+execute: 
+  warning: false
+  message: false
+  cache: true
+format:
+  html:
+    theme: cosmo
+    backgroundcolor: "#f2efea"
+    fontcolor: "black"
+    toc: true
+    toc-depth: 2
+    toc-location: right
+    embed-resources: true
+editor: visual
+---
+
+# Setup
+```{r}
+#| output: false
+library(tidyverse)
+library(quanteda)
+library(topicmodels)
+library(quanteda.textmodels)
+library(spacyr)
+library(corpustools)
+library(glue)
+```
+
+# Loading data
+```{r}
+real <- read_csv("real.csv", show_col_types = F)
+fake <- read_csv("fake.csv", show_col_types = F)
+```
+
+## Adding labels
+```{r}
+real$label <- "real"
+fake$label <- "fake"
+```
+
+## Combining data frames
+```{r}
+tweets <- rbind(real, fake) |>
+  drop_na() |> # dropping NA rows
+  mutate(tweet = str_trim(tweet) |> str_squish()) # removing white-spaces in the start and beginning of tweet, and between words
+```
+
+# Text preprocessing
+```{r}
+corp <- corpus(tweets, text_field = "tweet")
+```
+
+## Creating DFM & cleaning text
+```{r}
+data_feature_mat <- corp |>
+  tokens(remove_punct = T, remove_numbers = T, remove_url = T, remove_separators = T, remove_symbols = T) |>
+  tokens_wordstem() |>
+  dfm(tolower = T) |>
+  dfm_tfidf()
+```
+
+# Machine Learning
+### Train-test split
+```{r}
+set.seed(14)
+
+train_data <- dfm_sample(data_feature_mat, size = 0.8 * nrow(data_feature_mat))
+test_data <- data_feature_mat[setdiff(docnames(data_feature_mat), docnames(train_data)),]
+```
+
+## Naive-Bayes classifier
+```{r}
+nb_model <- textmodel_nb(train_data, y = docvars(train_data, "label"))
+```
+
+## Test performance
+```{r}
+pred_nb <- predict(nb_model, newdata = test_data)
+
+(conmat_nb <- table(pred_nb, docvars(test_data, "label")))
+```
+
+Confusion matrix
+```{r}
+caret::confusionMatrix(conmat_nb, mode = "everything", positive = "real")
+```
+
+## Logistic regression
+```{r}
+lr_model <- textmodel_lr(x = train_data, y = docvars(train_data, "label"))
+```
+
+## Test performance
+```{r}
+pred_lr <- predict(lr_model, newdata = test_data)
+
+(conmat_lt <- table(pred_lr, docvars(test_data, "label")))
+```
+
+Confusion matrix
+```{r}
+caret::confusionMatrix(conmat_lt, mode = "everything", positive = "real")
+```
+
+## Plot important words for classification
+```{r}
+#| out-width: 200%
+#| code-fold: true
+lr_summary <- summary(lr_model) # summarizing the model
+
+coefs <- data.frame(lr_summary$estimated.feature.scores) # extracting coefficients
+
+
+col_vec <- c("#fc7753", "#f2efea", "#66d7d1", "black")
+
+coefs |>
+  
+  # preparing df for plot
+  rownames_to_column(var = "Token") |>
+  rename(Coefficient = real) |>
+  filter(Coefficient != 0 & Token != "(Intercept)") |>
+  mutate(bigger_then_0 = Coefficient > 0) |>
+  
+  # ggplotting
+  ggplot(aes(x = Token, y = Coefficient, color = bigger_then_0)) +
+  geom_point() +
+  scale_color_manual(values = c(col_vec[1], col_vec[3])) +
+  scale_y_continuous(n.breaks = 10) +
+  labs(title = "Most important words for classifying if a tweet is fake news",
+       x = "") +
+  theme_classic() +
+  geom_hline(yintercept = 0, color = "black", linetype = 2, size = 1, show.legend = F) +
+  theme(plot.background = element_rect(color = col_vec[2], fill = col_vec[2]),
+        panel.background = element_rect(color = col_vec[2], fill = col_vec[2]),
+        axis.line = element_line(color = col_vec[4]),
+        axis.title = element_text(color = col_vec[4]),
+        axis.text = element_text(color = col_vec[4]),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12, face = "bold"),
+        legend.position = "none",
+        plot.title = element_text(size = 16, color = col_vec[4], hjust = .5, family = "serif", face = "bold"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
