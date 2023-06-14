@@ -1,0 +1,66 @@
+---
+title: "Trip Advisor ratings"
+author: "Tomer"
+format: html
+editor: visual
+---
+
+# Setup
+
+```{r}
+library(tidyverse)
+library(text)
+library(caret)
+library(gbm)
+library(quanteda)
+library(quanteda.textmodels)
+library(corpustools)
+```
+
+# Data
+
+```{r}
+reviews <- read_csv("New_Delhi_reviews.csv", show_col_types = F)
+
+reviews <- reviews |>
+  mutate(review_full = str_remove_all(review_full, pattern = "[[:punct:]]"))
+```
+
+# Word importance
+
+```{r}
+library(quanteda.textplots)
+library(quanteda.textstats)
+
+corp <- corpus(reviews, text_field = "review_full")
+
+dtm <- corp |>
+  tokens() |>
+  dfm()
+
+tstat_key <- textstat_keyness(dtm, target = docvars(dtm, "rating_review"))
+
+textplot_keyness(tstat_key)
+```
+
+# Vectorization
+
+```{r}
+reviews_emb <- textEmbed(reviews$review_full, model = "bert-base-uncased", layers = 11)
+```
+
+# Train-test split
+
+```{r}
+set.seed(14)
+train_indices <- createDataPartition(y = reviews$rating_review, p = 0.9, list = F)
+
+train_data <- reviews[train_indices,]
+test_data <- reviews[-train_indices,]
+```
+
+# Vectorization
+
+```{r}
+
+```
