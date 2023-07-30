@@ -208,23 +208,22 @@ But what is the angle between \~15,000 dimensions vectors?! fortunately, this ca
 What is the relation between the angle and it's cosine? without digging too deep, the larger the angle, the smaller the cosine. So the larger the cosine, the greater the similarity.
 
 ::: callout-note
-Nice insight: the cosine similarity is nothing but the un-standardized pearson correlation coefficient! Let $x$ and $y$ be vectors of Z scores. The correlation coefficient is:   
+Nice insight: the cosine similarity is nothing but the un-standardized pearson correlation coefficient! Let $x$ and $y$ be vectors of Z scores. The correlation coefficient is:\
 $$
 r_{xy}= \frac{\sum_{i=1}^{N}{x_i \cdot y_i}}{N}
-$$
-While the cosine of the angle between them is:  
+$$ While the cosine of the angle between them is:\
 $$
 cos \theta= \frac{\vec{x} \cdot \vec{y}}{|\vec{x}| \cdot |\vec{y}|}
-$$
-The length of a vector of Z scores is $\sqrt{N}$, therefore the denominator is always: $\sqrt{N} \cdot \sqrt{N}=N$.  
-The nominator is the dot product of the vectors, which is exactly the sum of the by-component products. Finally we get:  
+$$ The length of a vector of Z scores is $\sqrt{N}$, therefore the denominator is always: $\sqrt{N} \cdot \sqrt{N}=N$.\
+The numerator is the dot product of the vectors, which is exactly the sum of the by-component products. Finally we get:\
 $$
 r_{xy}=cos \ \theta_{xy}
 $$
 :::
 
 ### Functions
-The main idea of the recommendation generator is simple. If you liked a TV show or a movie, you will probably like shows with similar description. Not any similarity, cosine similarity!  
+
+The main idea of the recommendation generator is simple. If you liked a TV show or a movie, you will probably like shows with similar description. Not any similarity, cosine similarity!
 
 ```{r}
 get_recommendation <- function(show, liked = T) {
@@ -279,6 +278,7 @@ get_recommendation_plot <- function(show) {
 ```
 
 ### Getting show recommendations
+
 Let's use an example. Maybe I watched "Attack on Titan", what are the top 10 recommended shows for me?
 
 ```{r}
@@ -287,12 +287,11 @@ watched <- "Attack on Titan"
 get_recommendation(watched)
 ```
 
-What if I did not like a show? no problem, you will be recommended shows and movies that are not similar.
+What if I did not like a show? no problem, I will be recommended shows and movies that are not similar.
 
 ```{r}
 get_recommendation("I Am Sam", liked = FALSE)
 ```
-
 
 #### In a plot
 
@@ -301,11 +300,74 @@ get_recommendation_plot(watched)
 ```
 
 # Conclusion
-This post is an extra step of my in the NLP domain. As always I try to explain the theory behind the interesting parts of the process. For example, I remember when I discovered the connection between the correlation coefficient and the angle between vectors, it was really eye opening!  
+
+This post is an extra step of my learning in the NLP domain. As always I try to explain the theory behind the interesting parts of the process. For example, I remember when I discovered the connection between the correlation coefficient and the angle between vectors, it was really eye opening!\
 The recommendation functions could be vastly improved with some more modern NLP methods (Transformers!). I hope that in the near future I will have the time to post about that to.
 
+# Transformers!
+
+```{r}
+library(text)
+textrpp_initialize()
+```
+
+```{r}
+#| eval: false
+text_emb <- textEmbed(data_clean$description, model = "sentence-transformers/all-MiniLM-L6-v2", layers = 6)
+```
+
+```{r}
+#| echo: false
+text_emb <- read_rds("embedded_text.rds")
+```
+
+```{r}
+embedded_text_df <- text_emb$texts$texts
+
+embedded_text_df <- embedded_text_df |>
+  mutate(title = data_clean$title,
+         director = data_clean$director)
+
+
+
+get_recommendation_tran <- function(shows) {
+  
+  watched_shows_df <- embedded_text_df |>
+    filter(title %in% shows) |>
+    select(-title, -director) |>
+    t()
+  
+  other_shows_df <- embedded_text_df |>
+    filter(!(title %in% shows)) |>
+    select(-title, -director) |>
+    t()
+  
+  mean_liked_show <- rowMeans(watched_shows_df)
+  
+  similarities <- 
+  
+  return(other_shows_df)
+}
+
+
+
+get_recommendation_tran(c("I Am Sam", "Lucifer"))
+
+
+```
+
+```{r}
+text <- select(embedded_text_df, -title, -director) |>
+  t()
+
+v1 <- text[,1]
+v <- text[,-1]
+
+cors <- cor(v1, v)
+
+head(sort(cors, decreasing = T))
 
 
 
 
-
+```
