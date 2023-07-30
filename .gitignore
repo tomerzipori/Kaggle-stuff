@@ -6,3 +6,4 @@ Fifa23_player_research/fifa_23_player_rating_files/
 *.png
 *.html
 *cache/
+*.rds
